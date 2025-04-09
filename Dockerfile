@@ -11,4 +11,4 @@ COPY ./ ./
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/.venv/bin/python3", "-m", "piper_recording_studio", "--host", "0.0.0.0"]
+ENTRYPOINT ["/app/.venv/bin/python3", "-m", "ovos_recording_studio", "--host", "0.0.0.0"]

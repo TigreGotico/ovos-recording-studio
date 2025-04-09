@@ -5,7 +5,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <meta name="description" content="Contribute your voice to open source">
-        <meta name="author" content="Michael Hansen">
+
 
         <link href="css/bootstrap.min.css" rel="stylesheet">
         <link href="css/fontawesome-all.min.css" rel="stylesheet">
@@ -14,7 +14,7 @@
         <header>
             <nav class="navbar navbar-expand-md bg-light">
                 <div class="m-auto text-center">
-                    <img id="logo" src="img/logo.png" alt="Piper logo" style="height: 4em;" />
+                    <img id="logo" src="img/waveform.svg" alt="OpenVoiceOS logo" style="height: 4em;" />
                     <h2 class="font-weight-bold">
                         Recording Studio
                     </h2>
@@ -24,7 +24,10 @@
         <div class="container-fluid text-center mt-2">
             <div class="row-fluid text-center">
                 <p>
-                    Contribute to the <a href="https://www.home-assistant.io/blog/2022/12/20/year-of-voice/">Year of Voice</a> by recording yourself!
+                    Contribute to the <a href="https://opendata.tigregotico.pt">OpenData Initiative</a> by recording yourself!
+                </p>
+                <p>
+                    Your recordings are extremely valuable to improve the STT models used by OpenVoiceOS
                 </p>
                 {% if cc0: %}
                 <p>
@@ -32,12 +35,12 @@
                 </p>
                 {% endif %}
             </div>
-            {% if multi_user: %}
+
             <div class="row-fluid">
-                <label for="userId" class="mr-2">Login code:</label>
-                <input id="userId" type="text" placeholder="login code">
+                <label for="userId" class="mr-2">username:</label>
+                <input id="userId" type="text" placeholder="anonymous">
             </div>
-            {% endif %}
+
             <div class="row-fluid mt-3">
                 <select id="language">
                     <option value="" selected>Choose a language</option>
@@ -61,7 +64,7 @@
                     </form>
                 </div>
             </div>
-            {% if multi_user: %}
+
             <div class="row mt-5">
                 <div class="col">
                     <form id="formUpload" method="get" action="upload">
@@ -77,14 +80,13 @@
                     </form>
                 </div>
             </div>
-            {% endif %}
+
+            # TODO - add a record wake words option
         </div>
         <script>
-          {% if multi_user: %}
+
           var verbs = ['record', 'upload'];
-          {% else: %}
-          var verbs = ['record'];
-          {% endif %}
+
 
          function q(id) {
              return document.querySelector(id);
@@ -100,17 +102,16 @@
                  verbs.forEach(function(verb) {
                      q('#' + verb + 'Language').value = language;
 
-                     {% if multi_user: %}
+
                      let userId = q('#userId').value;
                      q('#' + verb + 'Button').disabled = (language.length < 1) || (userId.length < 1);
-                     {% else: %}
-                     q('#' + verb + 'Button').disabled = (language.length < 1);
-                     {% endif %}
+
+
                  });
 
              });
 
-             {% if multi_user: %}
+
              q('#userId').addEventListener('keyup', function() {
                  let language = q('#language').value;
                  let userId = q('#userId').value;
@@ -119,7 +120,7 @@
                      q('#' + verb + 'Button').disabled = (language.length < 1) || (userId.length < 1);
                  });
              });
-             {% endif %}
+
          });
         </script>
     </body>

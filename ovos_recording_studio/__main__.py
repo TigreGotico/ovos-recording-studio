@@ -17,9 +17,16 @@ from quart import (
     request,
     send_from_directory,
 )
+import hashlib
+
 
 _LOGGER = logging.getLogger(__name__)
 _DIR = Path(__file__).parent
+
+
+def get_munged_user_id(user_id: str, ip: str) -> str:
+    ip_hash = hashlib.md5(ip.encode()).hexdigest()[:8]
+    return f"{user_id}_{ip_hash}"
 
 
 @dataclass
@@ -34,8 +41,8 @@ class Prompt:
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=8644)
     #
     parser.add_argument(
         "--prompts",
@@ -49,11 +56,6 @@ def main() -> None:
         default=_DIR.parent / "output",
     )
     #
-    parser.add_argument(
-        "--multi-user",
-        action="store_true",
-        help="Require login code and user output directory to exist",
-    )
     parser.add_argument("--cc0", action="store_true", help="Show public domain notice")
     #
     parser.add_argument(
@@ -72,7 +74,7 @@ def main() -> None:
 
     prompts, languages = load_prompts(prompts_dirs)
 
-    app = Quart("piper", template_folder=str(_DIR / "templates"))
+    app = Quart("recordingstudio", template_folder=str(_DIR / "templates"))
     app.config["TEMPLATES_AUTO_RELOAD"] = True
     app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 200 mb
     app.secret_key = str(uuid4())
@@ -84,7 +86,7 @@ def main() -> None:
         return await render_template(
             "index.html",
             languages=sorted(languages.items()),
-            multi_user=args.multi_user,
+            multi_user=True,
             cc0=args.cc0,
         )
 
@@ -97,16 +99,12 @@ def main() -> None:
         """Record audio for a text prompt"""
         language = request.args["language"]
 
-        if args.multi_user:
-            user_id = request.args.get("userId")
-            audio_dir = output_dir / f"user_{user_id}"
-            user_dir = audio_dir / language
-            if not user_dir.is_dir():
-                _LOGGER.warning("No user/language directory: %s", user_dir)
-                user_id = None
-        else:
-            user_id = None
-            audio_dir = output_dir
+        user_id = request.args.get("userId")
+        #  naively separates different users that select same username
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        munged_id = get_munged_user_id(user_id, ip)
+
+        audio_dir = output_dir / f"user_{munged_id}"
 
         next_prompt, num_complete, num_items = get_next_prompt(
             prompts,
@@ -126,7 +124,7 @@ def main() -> None:
             num_complete=num_complete,
             num_items=num_items,
             complete_percent=complete_percent,
-            multi_user=args.multi_user,
+            multi_user=True,
             user_id=user_id,
         )
 
@@ -147,16 +145,16 @@ def main() -> None:
         if "wav" in audio_format:
             suffix = ".wav"
 
-        if args.multi_user:
-            user_id = form["userId"]
-            user_dir = output_dir / f"user_{user_id}"
-            if not user_dir.is_dir():
-                _LOGGER.warning("No user/language directory: %s", user_dir)
-                raise ValueError("Invalid login code")
+        user_id = form["userId"]
+        #  naively separates different users that select same username
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        munged_id = get_munged_user_id(user_id, ip)
+        user_dir = output_dir / f"user_{munged_id}"
+        user_dir.mkdir(parents=True, exist_ok=True)
 
-            audio_dir = user_dir
-        else:
-            audio_dir = output_dir
+        audio_dir = user_dir
+
+        # TODO - upload to ovos open data server instead of saving locally ?
 
         # Save audio and transcription
         audio_path = audio_dir / language / prompt_group / f"{prompt_id}{suffix}"
@@ -194,22 +192,11 @@ def main() -> None:
     async def api_upload() -> str:
         """Upload an existing dataset"""
         language = request.args["language"]
-
-        if args.multi_user:
-            user_id = request.args.get("userId")
-            audio_dir = output_dir / f"user_{user_id}"
-            user_dir = audio_dir / language
-            if not user_dir.is_dir():
-                _LOGGER.warning("No user/language directory: %s", user_dir)
-                raise RuntimeError("Invalid login code")
-        else:
-            user_id = None
-            audio_dir = output_dir
-
+        user_id = request.args.get("userId")
         return await render_template(
             "upload.html",
             language=language,
-            multi_user=args.multi_user,
+            multi_user=True,
             user_id=user_id,
         )
 
@@ -219,16 +206,10 @@ def main() -> None:
         form = await request.form
         language = form["language"]
 
-        if args.multi_user:
-            user_id = form.get("userId")
-            audio_dir = output_dir / f"user_{user_id}"
-            user_dir = audio_dir / language
-            if not user_dir.is_dir():
-                _LOGGER.warning("No user/language directory: %s", user_dir)
-                raise RuntimeError("Invalid login code")
-        else:
-            user_id = None
-            audio_dir = output_dir
+        user_id = form.get("userId")
+        audio_dir = output_dir / f"user_{user_id}"
+        user_dir = audio_dir / language
+        user_dir.mkdir(parents=True, exist_ok=True)
 
         files = await request.files
         dataset_file = files["dataset"]
